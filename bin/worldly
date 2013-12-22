@@ -1,0 +1,3 @@
+#!/bin/bash
+
+quark -f2 worldly.clp $@
