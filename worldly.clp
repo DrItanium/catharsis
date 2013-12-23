@@ -6,6 +6,10 @@
 (defclass pixel
   "Represents a location on a map"
   (is-a USER)
+  (slot update
+        (type SYMBOL)
+        (storage local)
+        (allowed-symbols FALSE TRUE))
   (slot position-x
         (type INTEGER)
         (storage local)
@@ -24,10 +28,10 @@
 (defglobal MAIN
            ?*block-width* = 32
            ?*block-height* = 32
-           ?*screen-width* = 512
-           ?*screen-height* = 384
-           ?*blocks-wide* = (/ ?*screen-width* ?*block-width*)
-           ?*blocks-tall* = (/ ?*screen-height* ?*block-height*)
+           ?*screen-width* = (screen/dimensions/width)
+           ?*screen-height* = (screen/dimensions/height)
+           ?*blocks-wide* = (div ?*screen-width* ?*block-width*)
+           ?*blocks-tall* = (div ?*screen-height* ?*block-height*)
            ?*block-count* = (* ?*blocks-wide* ?*blocks-tall*))
 
 (defmethod on-resized
@@ -36,6 +40,18 @@
   (if (and ?value (< (getwindow) 0)) then
     (printout werror "ERROR: couldn't reattach to window" crlf)
     (exit))
+  (bind ?*screen-width* (screen/dimensions/width))
+  (bind ?*screen-height* (screen/dimensions/height))
+  (bind ?*blocks-wide* (div ?*screen-width* ?*block-width*))
+  (bind ?*blocks-tall* (div ?*screen-height* ?*block-height*))
+  (bind ?*block-count* (* ?*blocks-wide* ?*blocks-tall*))
+  (do-for-all-instances ((?pixel pixel)) 
+                        (and (<= 0 (send ?pixel get-position-x)
+                                   (- ?*blocks-wide* 1))
+                             (<= 0 (send ?pixel get-position-y) ?*blocks-tall*))
+                        (send ?pixel put-update TRUE))
+  (modify-instance [screen-dim] (bx ?*screen-width*) (by ?*screen-height*))
+  (send [screen-dim] build-pointer)
   (screen/draw [screen-dim] [screen] [ZP])
   (assert (layout pixels)))
 
@@ -123,8 +139,10 @@
 
          =>
          (retract ?f)
-         (modify-instance ?old (type solid))
-         (modify-instance ?next (type empty))
+         (modify-instance ?old (type solid)
+                          (update TRUE))
+         (modify-instance ?next (type empty)
+                          (update TRUE))
          (assert (query keyboard)
                  (layout pixels)))
 
@@ -146,8 +164,10 @@
 
          =>
          (retract ?f)
-         (modify-instance ?old (type solid))
-         (modify-instance ?next (type empty))
+         (modify-instance ?old (type solid)
+                          (update TRUE))
+         (modify-instance ?next (type empty)
+                          (update TRUE))
          (assert (query keyboard)
                  (layout pixels)))
 
@@ -169,8 +189,8 @@
 
          =>
          (retract ?f)
-         (modify-instance ?old (type solid))
-         (modify-instance ?next (type empty))
+         (modify-instance ?old (type solid) (update TRUE))
+         (modify-instance ?next (type empty) (update TRUE))
          (assert (query keyboard)
                  (layout pixels)))
 
@@ -192,8 +212,8 @@
 
          =>
          (retract ?f)
-         (modify-instance ?old (type solid))
-         (modify-instance ?next (type empty))
+         (modify-instance ?old (type solid) (update TRUE))
+         (modify-instance ?next (type empty) (update TRUE))
          (assert (query keyboard)
                  (layout pixels)))
 
@@ -228,15 +248,17 @@
 (defrule relayout:image
          (declare (salience 9999))
          (layout pixels)
-         (object (is-a pixel)
-                 (type ?z)
-                 (position-x ?x)
-                 (position-y ?y))
+         ?pixel <- (object (is-a pixel)
+                           (update TRUE)
+                           (type ?z)
+                           (position-x ?x)
+                           (position-y ?y))
          (object (is-a rectangle)
                  (name [block])
                  (bx ?bx)
                  (by ?by))
          =>
+         (send ?pixel put-update FALSE)
          (modify-instance [scratch-rect] 
                           (x (* ?bx ?x))
                           (y (* ?by ?y))
